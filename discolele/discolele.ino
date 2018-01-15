@@ -1,3 +1,8 @@
+/*
+ * Firmware for discolele for Teensy 3.2
+ * 
+ * GPL
+ */
 #include <Adafruit_NeoPixel.h>
 #include <Bounce.h>
 
