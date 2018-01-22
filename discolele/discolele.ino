@@ -29,8 +29,19 @@
 #define CAP_NOTE_3 63
 #define CAP_NOTE_4 64
 
+#define SLIDER_NOTE_OFF 80
+#define SLIDER_NOTE_1 81
+#define SLIDER_NOTE_2 82
+#define SLIDER_NOTE_3 83
+#define SLIDER_NOTE_4 84
+#define SLIDER_NOTE_MAX 85
+
+
 #define KNOB_CTRL 11
 #define SLIDE_CTRL 12
+
+#define KNOB_NOTE_OFF 90
+#define KNOB_NOTE_ON 91
 
 
 // the MIDI channel number to send messages
@@ -47,11 +58,13 @@ TouchButton touch4 = TouchButton(CAP_4, 3000);
 // poti
 int poti_pin = A7;
 int potLast = 0;
+boolean potOn;
 
 //--------------------------------
 // slider
 int slide_pin = A6;
 boolean slideOn = false;
+int lastSlider = 0;
 
 //--------------------------------
 // button
@@ -64,8 +77,12 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMPIXELS, 17, NEO_GRB + NEO_KHZ800)
 byte stripState = 0;
 unsigned long animStart = 0;
 long animLast = 0;
-uint16_t animDuration = 1000; // milliseconds
-byte animSpeed = 10;
+uint16_t animDuration1 = 300; // milliseconds
+uint16_t animDuration2 = 600; // milliseconds
+uint16_t animDuration3 = 1000; // milliseconds
+
+uint16_t animDuration = animDuration1; // milliseconds
+
 
 Adafruit_NeoPixel shooting = Adafruit_NeoPixel(5, 0, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel shooting1 = Adafruit_NeoPixel(5, 0, NEO_GRB + NEO_KHZ800);
@@ -113,6 +130,11 @@ void initShoot1() {
 
 
 void setup() {
+
+//  pinMode(CAP_1, INPUT_PULLUP);
+//  pinMode(CAP_2, INPUT_PULLUP);
+//  pinMode(CAP_3, INPUT_PULLUP);
+//  pinMode(CAP_4, INPUT_PULLUP);
 
   // setup pins
   pinMode(btn_pin, INPUT_PULLUP);
@@ -177,8 +199,18 @@ void loop() {
   int pot_val = analogRead(poti_pin);
   if (pot_val != potLast) {
     potLast = pot_val;
-    usbMIDI.sendControlChange(KNOB_CTRL, map(pot_val, 0, 1023, 0, 127), channel);    
+    //usbMIDI.sendControlChange(KNOB_CTRL, map(pot_val, 0, 1023, 0, 127), channel);    
   }
+
+  if (!potOn && potLast > 500) {
+    potOn = true;
+    usbMIDI.sendNoteOn(KNOB_NOTE_ON, 99, channel);
+    
+  } else if (potOn && potLast <= 500) {
+    potOn = false;
+    usbMIDI.sendNoteOn(KNOB_NOTE_OFF, 99, channel);
+  }
+  
 
   //------------------------------------------------
   // read slider
@@ -186,10 +218,49 @@ void loop() {
   if (slide_val > 150) {
     slideOn = true;
     slide_val = map(slide_val, 188, 1023, 1, 127);
-    usbMIDI.sendControlChange(SLIDE_CTRL, constrain(slide_val, 1, 127), channel);    
+
+    if (potOn) {
+      // knob is "on"
+      if (slide_val > 1) {
+        if (slide_val < 12) {
+          if (lastSlider != SLIDER_NOTE_1) {
+            lastSlider = SLIDER_NOTE_1;
+            usbMIDI.sendNoteOn(SLIDER_NOTE_1, 99, channel);
+          }      
+        } else if (slide_val < 22) {
+          if (lastSlider != SLIDER_NOTE_2) {
+            lastSlider = SLIDER_NOTE_2;
+            usbMIDI.sendNoteOn(SLIDER_NOTE_2, 99, channel);
+          }      
+        } else if (slide_val < 40) {
+          if (lastSlider != SLIDER_NOTE_3) {
+            lastSlider = SLIDER_NOTE_3;
+            usbMIDI.sendNoteOn(SLIDER_NOTE_3, 99, channel);
+          }      
+        } else if (slide_val < 100) {
+          if (lastSlider != SLIDER_NOTE_4) {
+            lastSlider = SLIDER_NOTE_4;
+            usbMIDI.sendNoteOn(SLIDER_NOTE_4, 99, channel);
+          }      
+        } else if (lastSlider != SLIDER_NOTE_MAX) {
+          lastSlider = SLIDER_NOTE_MAX;
+          usbMIDI.sendNoteOn(SLIDER_NOTE_MAX, 99, channel);
+        }
+      }
+    } else {
+      // knob off
+      if (slide_val >= 100 && lastSlider != SLIDER_NOTE_MAX) {
+        lastSlider = SLIDER_NOTE_MAX;
+        usbMIDI.sendNoteOn(SLIDER_NOTE_MAX, 99, channel);
+      }
+    }
+    
+    //usbMIDI.sendControlChange(SLIDE_CTRL, constrain(slide_val, 1, 127), channel);    
   } else if (slideOn) {
     slideOn = false;
-    usbMIDI.sendControlChange(SLIDE_CTRL, 0, channel);
+    //usbMIDI.sendControlChange(SLIDE_CTRL, 0, channel);
+    lastSlider = SLIDER_NOTE_OFF;
+    usbMIDI.sendNoteOn(SLIDER_NOTE_OFF, 99, channel);
   }
 
   //------------------------------------------------
@@ -229,26 +300,30 @@ void loop() {
     }
     
     switch(stripState) {
-      case 11:
-        stripAnim1(_now, _delta);
-        break;
-      case 12:
-        stripAnim2(_now, _delta);
-        break;
-      case 13:
-        stripAnim3(_now, _delta);
-        break;
-      case 14:
-        stripAnim4(_now, _delta);
-        break;
-      case 15:
-        stripAnim5(_now, _delta);
-        break;
-        
-      default:
-        stripState = 0;
+
+      case 96: // C-6
         stripOff();
         break;
+      case 100: // E-6
+        stripAnim1(_now, _delta);
+        break;
+      case 101:
+        stripAnim2(_now, _delta);
+        break;
+      case 102:
+        stripAnim3(_now, _delta);
+        break;
+      case 103:
+        stripAnim4(_now, _delta);
+        break;
+      case 104:
+        stripAnim5(_now, _delta);
+        break;
+          
+//      default:
+//        stripState = 0;
+//        stripOff();
+//        break;
     }
 
     animLast = _now;
@@ -263,6 +338,11 @@ void loop() {
 //------------------------------------------------
 void OnNoteOn(byte channel, byte note, byte velocity) {
 
+  // light only channel 2
+  if (channel != 2) {
+    return;
+  }
+
   stripState = note;
 
   stripOff();
@@ -271,9 +351,9 @@ void OnNoteOn(byte channel, byte note, byte velocity) {
   animLast = animStart;
 
   switch(stripState) {
-    case 0:
-      stripOff();
-      break;
+//    case 0:
+//      stripOff();
+//      break;
     case 1:
       stripColor(255, 0, 0);
       break;
@@ -290,6 +370,17 @@ void OnNoteOn(byte channel, byte note, byte velocity) {
     case 13:
       initShoot();
       break;
+
+    // speed
+    case 24: // C-0
+      animDuration = animDuration1;
+      break;
+    case 25: // C#-0
+      animDuration = animDuration2;
+      break;
+    case 26: // D-0
+      animDuration = animDuration3;
+      break;
   }
 }
 
@@ -300,7 +391,7 @@ void OnVelocityChange(byte channel, byte note, byte velocity) {
 }
 
 void OnControlChange(byte channel, byte control, byte value) {
-  animDuration = (control << 8) + value;
+  //animDuration = (control << 8) + value;
 }
 
 void OnProgramChange(byte channel, byte program) {
