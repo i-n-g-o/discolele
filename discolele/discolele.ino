@@ -1,7 +1,7 @@
 /*
  * Firmware for discolele for Teensy 3.2
  * 
- * GPL
+ * GNU GPL
  */
 #include <Adafruit_NeoPixel.h>
 #include <Bounce.h>
@@ -9,6 +9,7 @@
 #include "TouchButton.h"
 
 #define DO_ANIMATION
+//#define DO_SERIAL
 
 
 #define NUMPIXELS      23
@@ -49,10 +50,10 @@ const int channel = 1;
 
 //--------------------------------
 // touch panels
-TouchButton touch1 = TouchButton(CAP_1, 3000);
-TouchButton touch2 = TouchButton(CAP_2, 3000);
-TouchButton touch3 = TouchButton(CAP_3, 3000);
-TouchButton touch4 = TouchButton(CAP_4, 3000);
+TouchButton touch1 = TouchButton(CAP_1, 1600);
+TouchButton touch2 = TouchButton(CAP_2, 1600);
+TouchButton touch3 = TouchButton(CAP_3, 1600);
+TouchButton touch4 = TouchButton(CAP_4, 1600);
 
 //--------------------------------
 // poti
@@ -77,27 +78,52 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMPIXELS, 17, NEO_GRB + NEO_KHZ800)
 byte stripState = 0;
 unsigned long animStart = 0;
 long animLast = 0;
-uint16_t animDuration1 = 300; // milliseconds
-uint16_t animDuration2 = 600; // milliseconds
-uint16_t animDuration3 = 1000; // milliseconds
-
-uint16_t animDuration = animDuration1; // milliseconds
+uint16_t animDuration = 300; // milliseconds
 
 
 Adafruit_NeoPixel shooting = Adafruit_NeoPixel(5, 0, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel shooting1 = Adafruit_NeoPixel(5, 0, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel shootingSinglePixel = Adafruit_NeoPixel(1, 0, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel shootingSinglePixel2 = Adafruit_NeoPixel(1, 0, NEO_GRB + NEO_KHZ800);
+
+// colors
+byte color1_r = 255;
+byte color1_g = 255;
+byte color1_b = 255;
+uint32_t color1 = strip.Color(color1_r, color1_g, color1_b);
+byte color2_r = 0;
+byte color2_g = 0;
+byte color2_b = 0;
+uint32_t color2 = strip.Color(color2_r, color2_g, color2_b);
+
+long pause_started = 0;
+
+boolean animation_flip = false;
+
+void initAllShootings() {
+  initShoot();
+  initShoot1();
+  initShootingSinglePixel();
+  initShootingSinglePixel2();
+}
 
 void initShoot() {
   shooting.clear();
 
-  uint32_t c1 = shooting.Color(150, 20, 20);
-  uint32_t c2 = shooting.Color(255, 255, 0);
+//  uint32_t c1 = shooting.Color(150, 20, 20);
+//  uint32_t c2 = shooting.Color(255, 255, 0);
+
+//    shooting.setPixelColor(0, 150, 20, 20);
+//  shooting.setPixelColor(1, 180, 50, 80);
+//  shooting.setPixelColor(2, 220, 100, 40);
+//  shooting.setPixelColor(3, 80, 150, 40);
+//  shooting.setPixelColor(4, 200, 150, 0);
   
-  shooting.setPixelColor(0, 150, 20, 20);
-  shooting.setPixelColor(1, 180, 50, 80);
-  shooting.setPixelColor(2, 220, 100, 40);
-  shooting.setPixelColor(3, 80, 150, 40);
-  shooting.setPixelColor(4, 200, 150, 0);
+  shooting.setPixelColor(0, color1);
+  shooting.setPixelColor(1, color1);
+  shooting.setPixelColor(2, color1);
+  shooting.setPixelColor(3, color1);
+  shooting.setPixelColor(4, color1);
   
 //  for (int i=0; i<5; i++) {
 //    float a = ((float)i) / 4;
@@ -113,20 +139,30 @@ void initShoot1() {
   
   shooting1.clear();
 
-  uint32_t c1 = shooting.Color(150, 20, 20);
-  uint32_t c2 = shooting.Color(255, 255, 0);
+//  uint32_t c1 = shooting.Color(150, 20, 20);
+//  uint32_t c2 = shooting.Color(255, 255, 0);
   
-  shooting1.setPixelColor(0, 0, 20, 0);
-  shooting1.setPixelColor(1, 30, 150, 30);
-  shooting1.setPixelColor(2, 100, 255, 100);
-  shooting1.setPixelColor(3, 30, 150, 30);
-  shooting1.setPixelColor(4, 0, 20, 0);
+  shooting1.setPixelColor(0, color1);
+  shooting1.setPixelColor(1, color1);
+  shooting1.setPixelColor(2, color1);
+  shooting1.setPixelColor(3, color1);
+  shooting1.setPixelColor(4, color1);
   
 //  for (int i=0; i<5; i++) {    
 //    shooting1.setPixelColor(i, 255, 0, 0);
 //  }
 }
 
+
+void initShootingSinglePixel() {
+  shootingSinglePixel.clear();
+  shootingSinglePixel.setPixelColor(0, color1);
+}
+
+void initShootingSinglePixel2() {
+  shootingSinglePixel2.clear();
+  shootingSinglePixel2.setPixelColor(0, color2);
+}
 
 
 void setup() {
@@ -148,17 +184,21 @@ void setup() {
   usbMIDI.setHandleAfterTouch(OnAfterTouch);
   usbMIDI.setHandlePitchChange(OnPitchChange);
 
-  initShoot();
-  initShoot1();
+  initAllShootings();
 
   // init neopixel strip
   strip.begin();
   strip.clear();
   strip.show();
+
+#ifdef DO_SERIAL
+  Serial.begin(9600);
+  Serial.println("init");
+#endif
 }
 
 void loop() {
-
+  
   //------------------------------------------------
   // read touch sensors
   if (touch1.update()) {
@@ -192,7 +232,6 @@ void loop() {
       usbMIDI.sendNoteOff(CAP_NOTE_4, 0, channel);
     }
   }
-  
 
   //------------------------------------------------
   // read knob
@@ -287,7 +326,7 @@ void loop() {
   //------------------------------------------------
   // animate led strip
 
-  if (stripState > 10) {
+  if (pause_started == 0) {
 
     unsigned long _now = millis();
 
@@ -301,25 +340,49 @@ void loop() {
     
     switch(stripState) {
 
-      case 96: // C-6
+      case 69:
         stripOff();
         break;
-      case 100: // E-6
-        stripAnim1(_now, _delta);
+      case 35: // E-6
+        laserShootLoop(_now, _delta);
         break;
-      case 101:
-        stripAnim2(_now, _delta);
+      case 36: // F-6
+        blinkLoop(_now, _delta);
         break;
-      case 102:
-        stripAnim3(_now, _delta);
+      case 42: // FIS-6
+        laserShot(_now, _delta);
         break;
-      case 103:
-        stripAnim4(_now, _delta);
+      case 39: // G-6
+        kittAnimation(_now, _delta);
         break;
-      case 104:
-        stripAnim5(_now, _delta);
+      case 37: // GIS-6
+        randomBrightness(_now, _delta);
         break;
-          
+      case 38: // A-6
+        fullColor(_now, _delta);
+        break;
+      case 46:
+        colorfade(_now, _delta);
+        break;
+      case 44:
+        breathe(_now, _delta);
+        break;
+      case 60:
+        randomWithRandomColor(_now, _delta);
+        break;
+      case 62:
+        colorFadeLoop(_now, _delta);
+        break;
+      case 64:
+        reverseBreathe(_now, _delta);
+        break;
+      case 65:
+        kittSinglePixel(_now, _delta);
+        break;
+      case 67:
+        kittDualPixel(_now, _delta);
+        break;
+         
 //      default:
 //        stripState = 0;
 //        stripOff();
@@ -337,50 +400,74 @@ void loop() {
 // handle midi signals
 //------------------------------------------------
 void OnNoteOn(byte channel, byte note, byte velocity) {
+#ifdef DO_SERIAL
+  Serial.print("note: ");
+  Serial.print(channel);
+  Serial.print(" - ");
+  Serial.print(note);
+  Serial.print(" - ");
+  Serial.println(velocity); 
+#endif
 
   // light only channel 2
   if (channel != 2) {
     return;
   }
 
-  stripState = note;
-
-  stripOff();
-
-  animStart = millis();
-  animLast = animStart;
-
-  switch(stripState) {
+  switch(note) {
 //    case 0:
 //      stripOff();
 //      break;
-    case 1:
-      stripColor(255, 0, 0);
-      break;
-    case 2:
-      stripColor(0, 255, 0);
-      break;
-    case 3:
-      stripColor(0, 0, 255);
-      break;
-    case 4:
-      stripColor(255, 255, 255);
-      break;
-
-    case 13:
-      initShoot();
-      break;
+//    case 1:
+//      stripColor(255, 0, 0);
+//      break;
+//    case 2:
+//      stripColor(0, 255, 0);
+//      break;
+//    case 3:
+//      stripColor(0, 0, 255);
+//      break;
+//    case 4:
+//      stripColor(255, 255, 255);
+//      break;
+//
+//    case 13:
+//      initShoot();
+//      break;
 
     // speed
-    case 24: // C-0
-      animDuration = animDuration1;
+//    case 24: // C-0
+//      animDuration = animDuration1;
+//      break;
+//    case 25: // C#-0
+//      animDuration = animDuration2;
+//      break;
+//    case 26: // D-0
+//      animDuration = animDuration3;
+//      break;
+
+    case 71:
+      if (pause_started == 0) {
+        pause_started = millis();
+      }      
       break;
-    case 25: // C#-0
-      animDuration = animDuration2;
+    case 72:
+      if (pause_started > 0) {
+        //adjust
+        long pause_duration = millis() - pause_started;       
+        animStart += pause_duration;
+        pause_started = 0;
+      }
       break;
-    case 26: // D-0
-      animDuration = animDuration3;
-      break;
+
+    default:
+      // animations
+      stripState = note;
+      pause_started = 0;
+      stripOff();
+      animStart = millis();
+      animLast = animStart;
+      animation_flip = false;     
   }
 }
 
@@ -392,6 +479,67 @@ void OnVelocityChange(byte channel, byte note, byte velocity) {
 
 void OnControlChange(byte channel, byte control, byte value) {
   //animDuration = (control << 8) + value;
+  
+  // light only channel 2
+  if (channel != 2) {
+    return;
+  }
+
+  value = map(value, 0, 127, 0, 255);
+
+  switch (control) {
+
+    // intensity
+    case 4:
+      strip.setBrightness(value);
+      initAllShootings();
+      shooting.setBrightness(value);
+      shooting1.setBrightness(value);
+      shootingSinglePixel.setBrightness(value);
+      shootingSinglePixel2.setBrightness(value);
+      break;
+
+    // speed
+    case 8:
+      animDuration = map(value, 0, 255, 2, 2000);
+      break;
+
+
+    // color 1
+    case 1: // R      
+      color1_r = value;
+      color1 = strip.Color(color1_r, color1_g, color1_b);     
+      initAllShootings();
+      break;
+    case 2: // G
+      color1_g = value;
+      color1 = strip.Color(color1_r, color1_g, color1_b);
+      initAllShootings();
+      break;
+    case 3: // B
+      color1_b = value;
+      color1 = strip.Color(color1_r, color1_g, color1_b);
+      initAllShootings();
+      break;
+
+    // color 2
+    case 5: // R      
+      color2_r = value;
+      color2 = strip.Color(color2_r, color2_g, color2_b);
+      initShootingSinglePixel2();
+      break;
+    case 6: // G
+      color2_g = value;
+      color2 = strip.Color(color2_r, color2_g, color2_b);
+      initShootingSinglePixel2();
+      break;
+    case 7: // B
+      color2_b = value;
+      color2 = strip.Color(color2_r, color2_g, color2_b);
+      initShootingSinglePixel2();
+      break;   
+  }
+  
 }
 
 void OnProgramChange(byte channel, byte program) {
@@ -424,7 +572,11 @@ void stripColor(uint8_t r, uint8_t g, uint8_t b) {
   strip.show();
 }
 
-void stripAnim1(unsigned long _now, long _delta) {
+
+/**
+ * swipe
+ */
+void laserShootLoop(unsigned long _now, long _delta) {
 
   long d = _delta % (long)animDuration;
   float f = (float)d / animDuration;
@@ -433,24 +585,240 @@ void stripAnim1(unsigned long _now, long _delta) {
 
   for(int i=0; i<NUMPIXELS; i++) {
     if (i < num) {
-      strip.setPixelColor(i, 255, 255, 255);
+      strip.setPixelColor(i, color1);
     } else {
-      strip.setPixelColor(i, 0, 0, 0);
+      strip.setPixelColor(i, color2);
     }
   }
 
   strip.show();
 }
 
-void stripAnim2(unsigned long _now, long _delta) {
+
+/**
+ * full color1
+ */
+void fullColor(unsigned long _now, long _delta) {
+
+  for(int i=0; i<NUMPIXELS; i++) {
+    strip.setPixelColor(i, color1);
+  }
+  
+  strip.show();
+}
+
+
+/**
+ * full fade from color1 to color2
+ */
+void colorfade(unsigned long _now, long _delta) {
+
+  if (_delta >= animDuration) {
+    for(int i=0; i<NUMPIXELS; i++) {
+      strip.setPixelColor(i, color2);
+    }
+    strip.show();
+    
+    return;
+  }
+  
+//  long d = _delta % (long)animDuration;
+  float f = (float)_delta / animDuration;
+
+  long time_thresh = _delta % 50;
+  
+  byte r = (byte)((float)color1_r*(1.0-f) + (float)color2_r*f);
+  byte g = (byte)((float)color1_g*(1.0-f) + (float)color2_g*f);
+  byte b = (byte)((float)color1_b*(1.0-f) + (float)color2_b*f); 
+  
+  for(int i=0; i<NUMPIXELS; i++) {
+    strip.setPixelColor(i, r, g, b);
+  }
+
+  strip.show();
+}
+
+
+
+/**
+ * full fade in out
+ */
+void colorFadeLoop(unsigned long _now, long _delta) {
+
+  if (_delta >= animDuration) {
+//    for(int i=0; i<NUMPIXELS; i++) {
+//      if (animation_flip) {
+//        strip.setPixelColor(i, color1);
+//      } else {
+//        strip.setPixelColor(i, color2);
+//      }
+//    }
+//    strip.show();
+
+    animStart = millis();
+    animLast = animStart;
+
+    animation_flip = !animation_flip;
+    
+    return;
+  }
+  
+  long d = _delta % (long)animDuration;
+
+  float f = (float)d / animDuration;
+  if (animation_flip) {
+    f = 1.0 - ((float)d / animDuration);
+  }
+
+  float f1 = f*f;
+
+  long time_thresh = _delta % 50;
+  
+  byte r = (byte)((float)color1_r*(f1) + (float)color2_r*(1.0-f1));
+  byte g = (byte)((float)color1_g*(f1) + (float)color2_g*(1.0-f1));
+  byte b = (byte)((float)color1_b*(f1) + (float)color2_b*(1.0-f1)); 
+
+  int half = NUMPIXELS/2-1;
+  float half_f = (NUMPIXELS/2 * f) - 3;
+  
+  for (int i=0; i<NUMPIXELS; i++) {
+    strip.setPixelColor(i, r, g, b);
+  }
+
+  strip.show();
+}
+
+
+
+/**
+ * breathe
+ */
+void breathe(unsigned long _now, long _delta) {
+
+  if (_delta >= animDuration) {
+//    for(int i=0; i<NUMPIXELS; i++) {
+//      if (animation_flip) {
+//        strip.setPixelColor(i, color1);
+//      } else {
+//        strip.setPixelColor(i, color2);
+//      }
+//    }
+//    strip.show();
+
+    animStart = millis();
+    animLast = animStart;
+
+    animation_flip = !animation_flip;
+    
+    return;
+  }
+  
+  long d = _delta % (long)animDuration;
+
+  float f = (float)d / animDuration;
+  if (animation_flip) {
+    f = 1.0 - ((float)d / animDuration);
+  }
+
+  float f1 = f*f*f*f;
+
+  long time_thresh = _delta % 50;
+  
+  byte r = (byte)((float)color1_r*(f1) + (float)color2_r*(1.0-f1));
+  byte g = (byte)((float)color1_g*(f1) + (float)color2_g*(1.0-f1));
+  byte b = (byte)((float)color1_b*(f1) + (float)color2_b*(1.0-f1)); 
+
+  int half = NUMPIXELS/2-1;
+  float half_f = (NUMPIXELS/2 * f) - 3;
+  
+  for (int i=0; i<NUMPIXELS; i++) {
+
+    if (i < (half - half_f ) || i > (half + half_f-1)) {
+      strip.setPixelColor(i, 0, 0, 0);
+    } else {
+
+      float v = (float)(half_f - abs(half - i)) / (float)half_f;
+      
+      strip.setPixelColor(i, r*v, g*v, b*v);
+    }
+    
+    
+  }
+
+  strip.show();
+}
+
+
+/**
+ * reverse breathe
+ */
+void reverseBreathe(unsigned long _now, long _delta) {
+
+  if (_delta >= animDuration) {
+//    for(int i=0; i<NUMPIXELS; i++) {
+//      if (animation_flip) {
+//        strip.setPixelColor(i, color1);
+//      } else {
+//        strip.setPixelColor(i, color2);
+//      }
+//    }
+//    strip.show();
+
+    animStart = millis();
+    animLast = animStart;
+
+    animation_flip = !animation_flip;
+    
+    return;
+  }
+  
+  long d = _delta % (long)animDuration;
+
+  float f = (float)d / animDuration;
+  if (animation_flip) {
+    f = 1.0 - ((float)d / animDuration);
+  }
+
+  float f1 = f*f;
+
+  long time_thresh = _delta % 50;
+  
+  byte r = (byte)((float)color1_r*(f1) + (float)color2_r*(1.0-f1));
+  byte g = (byte)((float)color1_g*(f1) + (float)color2_g*(1.0-f1));
+  byte b = (byte)((float)color1_b*(f1) + (float)color2_b*(1.0-f1)); 
+
+  int half = NUMPIXELS/2;
+  float half_f = (NUMPIXELS/2 * f) - 3;
+  
+  for (int i=0; i<NUMPIXELS; i++) {
+
+    if (i < (half - half_f ) || i > (half + half_f)) {
+      float v = (float)(half_f - abs(half - i)) / (float)half_f;      
+      strip.setPixelColor(i, r*v, g*v, b*v);
+    } else {
+      strip.setPixelColor(i, 0, 0, 0);
+    }
+    
+    
+  }
+
+  strip.show();
+}
+
+
+
+/**
+ * full blink
+ */
+void blinkLoop(unsigned long _now, long _delta) {
 
   float duration = animDuration;
 
   long d = _delta % (long)duration;
 
-  uint32_t c = strip.Color(255, 255, 255);
+  uint32_t c = color1;
   if (d < (duration/2)) {
-    c = strip.Color(0, 0, 0);
+    c = color2;
   }
 
   for(int i=0; i<NUMPIXELS; i++) {
@@ -487,7 +855,10 @@ void blit(uint8_t* t, int tpc, uint8_t* s, int spc, long pixel) {
   }
 }
 
-void stripAnim3(unsigned long _now, long _delta) {
+/**
+ * shoot
+ */
+void laserShot(unsigned long _now, long _delta) {
 
   if (_delta > animDuration) {
     animOff();
@@ -508,12 +879,10 @@ void stripAnim3(unsigned long _now, long _delta) {
   strip.show();
 }
 
-void stripAnim4(unsigned long _now, long _delta) {
-
-//  if (_delta > 2*animDuration) {
-//    animOff();
-//    return;
-//  }
+/**
+ * K.I.T.T animation
+ */
+void kittAnimation(unsigned long _now, long _delta) {
 
   _delta = _delta % (2*animDuration);
 
@@ -536,20 +905,135 @@ void stripAnim4(unsigned long _now, long _delta) {
   strip.show();  
 }
 
-void stripAnim5(unsigned long _now, long _delta) {
+/**
+ * K.I.T.T single pixel
+ */
+void kittSinglePixel(unsigned long _now, long _delta) {
 
-  if (_delta > animDuration) {
-    animOff();
+  _delta = _delta % (2*animDuration);
+
+  Adafruit_NeoPixel& obj = shootingSinglePixel;
+ 
+  float percent = (float)(_delta % (long)animDuration) / animDuration; 
+
+  int shooting_pc = obj.numPixels();
+  int virtualNum = shooting_pc + NUMPIXELS;
+  
+  int off = 0;
+  if (_delta <= animDuration) {
+    off = (int)((float)virtualNum * percent) - shooting_pc;
+  } else {
+    off = (int)((float)virtualNum * (1.0 - percent)) - shooting_pc;
+  }
+  
+  strip.clear();  
+  blit(strip.getPixels(), NUMPIXELS, obj.getPixels(), shooting_pc, off);
+  strip.show();  
+}
+
+
+/**
+ * K.I.T.T dual pixel
+ */
+void kittDualPixel(unsigned long _now, long _delta) {
+
+//  long d = _delta % (long)(2*animDuration);
+//  float percent2 = (float)d / animDuration;
+
+  _delta = _delta % (2*animDuration);
+  
+
+  Adafruit_NeoPixel& obj = shootingSinglePixel;
+  Adafruit_NeoPixel& obj2 = shootingSinglePixel2;
+ 
+  float percent = (float)(_delta % (long)animDuration) / animDuration;
+  float percent2 = percent * 2;
+  if (percent2 > 1.0) {
+    percent2 = 2.0 - percent2;
+  }
+
+  int shooting_pc = obj.numPixels();
+  int shooting_pc2 = obj2.numPixels();
+  int virtualNum = shooting_pc + NUMPIXELS;
+  int virtualNum2 = shooting_pc2 + NUMPIXELS;
+  
+  int off = 0;
+  int off2 = 0;
+  if (_delta <= animDuration) {
+    off = (int)((float)virtualNum * percent) - shooting_pc;
+    off2 = (int)((float)virtualNum2 * percent2) - shooting_pc2;
+  } else {
+    off = (int)((float)virtualNum * (1.0 - percent)) - shooting_pc;
+    off2 = (int)((float)virtualNum2 * (1.0 - percent2)) - shooting_pc2;
+  }
+  
+  strip.clear();  
+  blit(strip.getPixels(), NUMPIXELS, obj.getPixels(), shooting_pc, off);
+  blit(strip.getPixels(), NUMPIXELS, obj2.getPixels(), shooting_pc2, off2);
+  strip.show();
+}
+
+/**
+ * random
+ */
+void randomBrightness(unsigned long _now, long _delta) {
+
+  if (_delta >= animDuration) {
+    animStart = millis();
+    animLast = animStart;
+
+    animation_flip = false;
+    
     return;
   }
 
-  long d = _delta % 50;
-  
-  if (d < 10) {
-    for(int i=0; i<NUMPIXELS; i++) {
-      strip.setPixelColor(i, random(255), 0, 0);
-    }
-    strip.show();
+  if (animation_flip) {
+    return;
   }
 
+  animation_flip = true;
+  
+  for(int i=0; i<NUMPIXELS; i++) {
+    float r = (float)random(765)/255.;
+
+    if (r <= 1.0) {
+      strip.setPixelColor(i, color1_r*r, color1_g*r, color1_b*r);
+    } else {
+      r = r - 1.0;
+      r = r / 2.0;
+      strip.setPixelColor(i, color2_r*(r), color2_g*(r), color2_b*(r));
+    }
+    
+    
+  }
+  strip.show();
+
+}
+
+
+/**
+ * random with random color
+ */
+void randomWithRandomColor(unsigned long _now, long _delta) {
+
+  if (_delta >= animDuration) {
+    animStart = millis();
+    animLast = animStart;
+
+    animation_flip = false;
+    
+    return;
+  }
+
+  if (animation_flip) {
+    return;
+  }
+
+  animation_flip = true;
+  
+  for(int i=0; i<NUMPIXELS; i++) {
+    float r = (float)random(255)/255.;
+    strip.setPixelColor(i, random(255)*r, random(255)*r, random(255)*r);
+  }
+  strip.show();
 }
