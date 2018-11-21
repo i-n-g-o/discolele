@@ -25,7 +25,7 @@ public:
   }
 
   void drawMarquee(DMD& dmd) {
-    dmd.drawMarquee(m_message.c_str(), m_message.length(), (DMD_PIXELS_ACROSS*DISPLAYS_ACROSS)-1,0);
+    dmd.drawMarquee(m_message.c_str(), m_message.length(), (DMD_PIXELS_ACROSS*DISPLAYS_ACROSS)-1, 0);
   }
 
   String m_message;
