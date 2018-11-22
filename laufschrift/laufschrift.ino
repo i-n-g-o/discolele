@@ -13,6 +13,7 @@
 
 /*
  * using Teensy 3.2
+ * MIDI - only
  */
 #define DO_SERIAL
 
